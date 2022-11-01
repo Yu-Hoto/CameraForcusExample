@@ -26,14 +26,14 @@ struct ContentView: View {
                     .addCamera(camera)
             }
         }
-        .onAppear { camera.start()
-            print("Appear") }
-        .onDisappear { camera.stop()
-            print("Disappear")}
+        .onAppear { camera.start() }
+        .onDisappear { camera.stop() }
     }
 }
 
 private struct CameraModifier: ViewModifier {
+
+    @Namespace var id
 
     @State var camera: Camera
     @State var tapPositionState: CGPoint?
@@ -55,9 +55,10 @@ private struct CameraModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
+            .coordinateSpace(name: id)
             .overlay(sight)
             .gesture(
-                DragGesture(minimumDistance: 0, coordinateSpace: .global)
+                DragGesture(minimumDistance: 0, coordinateSpace: .named(id))
                     .onEnded { value in
                         print("tapped location(view): ", value.location)
                         publisher.send(value.location)
