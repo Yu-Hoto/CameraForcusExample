@@ -25,45 +25,51 @@ struct ContentView: View {
                     .addCamera(camera)
             }
         }
-        .onAppear { camera.start() }
-        .onDisappear { camera.stop()}
+        .onAppear { camera.start()
+            print("Appear") }
+        .onDisappear { camera.stop()
+            print("Disappear")}
     }
 }
 
 private struct CameraModifier: ViewModifier {
 
     @State var camera: Camera
-    @State var tap = false
-    @State var tapPosition = CGPoint(x: 0, y: 0)
+    @State var tapPositionState: CGPoint?
 
     func body(content: Content) -> some View {
-        content
-            .overlay(
-                Rectangle()
-                    .stroke(Color.yellow, lineWidth: 2)
-                    .frame(width: tap ? 100 : 150, height: tap ? 100 : 150, alignment: .center)
-                    .opacity(tap ? 1 : 0)
-                    .position(x: tapPosition.x, y: tapPosition.y)
-            )
-            .gesture(
-                DragGesture(minimumDistance: 0, coordinateSpace: .global)
-                    .onEnded { value in
-                        print("tapped location(view): ", value.location)
-                        withAnimation(.easeInOut) {
-                            tap = true
-                        }
-                        tapPosition = value.location
-                        let point = camera.previewLayer?.captureDevicePointConverted(fromLayerPoint: value.location)
-                        print("tapped location(camera): ", point ?? .zero)
-                        camera.forcusAndExposure(point)
 
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                            withAnimation(.easeInOut) {
-                                tap = false
+        if let position = tapPositionState {
+            content
+                .overlay(
+                    Rectangle()
+                        .stroke(Color.yellow, lineWidth: 2)
+                        .frame(width: 100, height: 100, alignment: .center)
+                        .position(x: position.x, y: position.y)
+                        .animation(nil)
+                        .transition(.scale)
+                        .onAppear { print("onAppear(transition)") }
+                        .onDisappear { print("onDisappear(transition)") }
+                )
+        } else {
+            content
+                .gesture(
+                    DragGesture(minimumDistance: 0, coordinateSpace: .global)
+                        .onEnded { value in
+                            print("tapped location(view): ", value.location)
+                            tapPositionState = value.location
+                            let point = camera.previewLayer?.captureDevicePointConverted(fromLayerPoint: value.location)
+                            print("tapped location(camera): ", point ?? .zero)
+                            camera.forcusAndExposure(point)
+
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                                tapPositionState = nil
                             }
                         }
-                    }
-            )
+                )
+                .onAppear { print("onAppear(gesture)") }
+                .onDisappear { print("onDisappear(gesture)") }
+        }
     }
 }
 
