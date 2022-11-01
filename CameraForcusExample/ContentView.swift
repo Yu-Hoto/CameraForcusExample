@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import Combine
 
 struct ContentView: View {
 
@@ -26,44 +27,58 @@ struct ContentView: View {
             }
         }
         .onAppear { camera.start() }
-        .onDisappear { camera.stop()}
+        .onDisappear { camera.stop() }
     }
 }
 
 private struct CameraModifier: ViewModifier {
 
+    @Namespace var id
+
     @State var camera: Camera
-    @State var tap = false
-    @State var tapPosition = CGPoint(x: 0, y: 0)
+    @State var tapPositionState: CGPoint?
+
+    let publisher = PassthroughSubject<CGPoint, Never>()
+
+    @ViewBuilder
+    var sight: some View {
+        GeometryReader { geometry in
+            if let position = tapPositionState {
+                Rectangle()
+                    .stroke(Color.yellow, lineWidth: 2)
+                    .frame(width: 100, height: 100, alignment: .center)
+                    .transition(.opacity.combined(with: .scale(scale: 1.25, anchor: UnitPoint(x: position.x / geometry.size.width, y: position.y / geometry.size.height))))
+                    .position(x: position.x, y: position.y)
+            }
+        }
+    }
 
     func body(content: Content) -> some View {
         content
-            .overlay(
-                Rectangle()
-                    .stroke(Color.yellow, lineWidth: 2)
-                    .frame(width: tap ? 100 : 150, height: tap ? 100 : 150, alignment: .center)
-                    .opacity(tap ? 1 : 0)
-                    .position(x: tapPosition.x, y: tapPosition.y)
-            )
+            .coordinateSpace(name: id)
+            .overlay(sight)
             .gesture(
-                DragGesture(minimumDistance: 0, coordinateSpace: .global)
+                DragGesture(minimumDistance: 0, coordinateSpace: .named(id))
                     .onEnded { value in
                         print("tapped location(view): ", value.location)
-                        withAnimation(.easeInOut) {
-                            tap = true
-                        }
-                        tapPosition = value.location
+                        publisher.send(value.location)
                         let point = camera.previewLayer?.captureDevicePointConverted(fromLayerPoint: value.location)
                         print("tapped location(camera): ", point ?? .zero)
                         camera.forcusAndExposure(point)
-
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                            withAnimation(.easeInOut) {
-                                tap = false
-                            }
-                        }
                     }
             )
+            .onReceive(publisher) { value in
+                withAnimation {
+                    tapPositionState = value
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    if value == tapPositionState {
+                        withAnimation {
+                            tapPositionState = nil
+                        }
+                    }
+                }
+            }
     }
 }
 
